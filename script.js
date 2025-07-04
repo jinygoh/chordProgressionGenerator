@@ -65,8 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- Initialization ---
-    async function init() {
-        console.log("Initializing ChordFlow...");
+    async function initializeChordFlow() { // Renamed from init
+        console.log("Initializing ChordFlow (after Tone.js check)...");
 
         // Initialize base Web Audio API AudioContext (Tone.js will use its own or can adopt this)
         try {
@@ -931,8 +931,28 @@ async function exportWAV() {
     }
 
     // --- Start the application ---
-    init();
-});
+
+    // Define waitForToneAndInit here, within the same scope as initializeChordFlow
+    function waitForToneAndInit(retryCount = 0) {
+        if (typeof Tone !== 'undefined') {
+            console.log("Tone.js confirmed loaded, initializing ChordFlow.");
+            initializeChordFlow(); // Now it can find initializeChordFlow as they are in the same scope
+        } else if (retryCount < 50) { // Try for ~5 seconds (50 * 100ms)
+            // console.log("Tone.js not yet loaded, retrying..."); // Can be noisy for user
+            setTimeout(() => waitForToneAndInit(retryCount + 1), 100);
+        } else {
+            console.error("Tone.js failed to load after multiple retries. Playback will not work.");
+            alert("Audio library (Tone.js) failed to load. Chord playback will not function correctly.");
+            // Fallback: Initialize UI without audio-dependent parts if possible
+            // initializeNonAudioParts(); // A hypothetical function
+        }
+    }
+
+    // Start the process by calling waitForToneAndInit
+    waitForToneAndInit();
+
+}); // End of the single, main DOMContentLoaded listener
+
 
 // Polyfill for requestAnimationFrame and cancelAnimationFrame
 (function() {
