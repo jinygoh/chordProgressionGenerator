@@ -1,0 +1,449 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+body {
+    background-color: #121212;
+    color: #EAEAEA;
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem; /* Increased padding */
+    background-color: #181818;
+    border-bottom: 1px solid #282828; /* Subtle separator */
+}
+
+header h1 {
+    margin: 0;
+    font-size: 1.75rem; /* Slightly larger */
+    font-weight: 700; /* Bolder */
+    letter-spacing: 0.5px;
+}
+
+#randomizeAll {
+    background-color: #00F5D4; /* Teal */
+    color: #121212; /* Dark text for contrast */
+    border: none;
+    padding: 0.6rem 1.2rem; /* Slightly larger padding */
+    cursor: pointer;
+    font-weight: 600; /* Semi-bold */
+    border-radius: 5px; /* Slightly more rounded */
+    transition: background-color 0.2s ease-in-out, transform 0.1s ease;
+}
+
+#randomizeAll:hover {
+    background-color: #00DFC0; /* Lighter teal on hover */
+}
+
+#randomizeAll:active {
+    transform: scale(0.98); /* Click effect */
+}
+
+main {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem; /* Unified padding for main content area */
+}
+
+.controls {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem; /* Increased space */
+    /* padding: 0 1.5rem; */ /* Removed, main now handles horizontal padding */
+}
+
+.controls select {
+    padding: 0.6rem 0.8rem; /* Adjusted padding */
+    background-color: #282828;
+    color: #EAEAEA;
+    border: 1px solid #383838; /* Slightly lighter border */
+    border-radius: 5px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    min-width: 120px; /* Ensure decent width */
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.controls select:hover {
+    border-color: #555;
+}
+
+.controls select:focus {
+    outline: none;
+    border-color: #00F5D4; /* Teal focus highlight */
+    box-shadow: 0 0 0 2px rgba(0, 245, 212, 0.3); /* Subtle glow */
+}
+
+.piano-roll-container {
+    display: flex;
+    flex-grow: 1;
+    gap: 1rem;
+    /* padding: 0 1.5rem 1.5rem 1.5rem; */ /* Removed horizontal, main handles it. Added bottom for spacing if needed */
+    padding-bottom: 1.5rem;
+    background-color: #121212; /* Match body background, or remove if main's bg is enough */
+}
+
+.vertical-piano {
+    width: 60px;
+    background-color: #1C1C1C; /* Darker background for piano itself */
+    display: flex;
+    flex-direction: column-reverse;
+    border: 1px solid #282828;
+    border-radius: 4px;
+    overflow: hidden; /* Ensure keys don't spill out */
+}
+
+.piano-roll {
+    flex-grow: 1;
+    background-color: #1C1C1C; /* Darker background for roll */
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border: 1px solid #282828; /* Grid border */
+    position: relative;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.piano-roll-bar { /* Style for the bar column guides */
+    border-right: 1px solid #282828; /* Vertical lines between bars */
+    box-sizing: border-box; /* Ensure border doesn't add to width */
+}
+.piano-roll-bar:last-child {
+    border-right: none; /* No line after the last bar */
+}
+
+/* Note Block styles refined */
+.note-block {
+    background-color: #00F5D4; /* Teal notes */
+    position: absolute;
+    border-radius: 3px;
+    box-sizing: border-box;
+    opacity: 0.85;
+    transition: background-color 0.1s ease, opacity 0.1s ease, transform 0.1s ease;
+    border: 1px solid rgba(0,0,0,0.2);
+    box-shadow: inset 0 0 3px rgba(0,0,0,0.3), 0px 1px 2px rgba(0,0,0,0.2); /* Subtle depth */
+}
+.note-block:hover {
+    opacity: 1;
+    transform: scale(1.02); /* Slight grow on hover */
+}
+
+/* Highlighted Piano Key refined */
+.highlighted-key {
+    background-color: #00F5D4 !important;
+    /* border-color: #00DFC0 !important; */ /* Optional: change border color too */
+    transition: background-color 0.05s ease-out !important; /* Ensure transition applies */
+}
+.highlighted-key .key-name {
+    color: #121212 !important;
+}
+
+/* Playhead refined */
+.playhead {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: #FF00A8; /* Magenta playhead */
+    left: 0;
+    z-index: 20;
+    /* Removed CSS transition for 'left'. JS will update it directly for accuracy. */
+    /* box-shadow: 0 0 5px #FF00A8; */ /* Optional: glow effect */
+}
+
+
+/* Chord Label Container - alignment based on main's padding */
+.chord-label-container {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    padding-left: calc(60px + 1rem); /* vertical piano width + piano-roll-container gap */
+    /* No right padding, it should extend naturally. Gap handles spacing between labels. */
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+    box-sizing: border-box;
+}
+
+
+footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.5rem; /* Consistent padding */
+    background-color: #181818;
+    border-top: 1px solid #282828; /* Subtle separator */
+    flex-wrap: wrap;
+    gap: 1rem; /* Gap between control groups if they wrap */
+}
+
+.playback-controls, .export-controls {
+    display: flex;
+    gap: 0.75rem; /* Adjusted gap */
+    align-items: center;
+}
+
+footer button { /* General style for footer buttons */
+    background-color: #282828;
+    color: #EAEAEA;
+    border: 1px solid #383838;
+    padding: 0.5rem 1rem;
+    border-radius: 5px;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+}
+
+footer button:hover {
+    background-color: #333333;
+    border-color: #555;
+}
+
+footer button:active {
+    transform: scale(0.98);
+}
+
+/* Specific button highlights for Play/Pause */
+#playPause {
+    min-width: 80px; /* Ensure Play/Pause text fits */
+    background-color: #28a745; /* Green for "Play" */
+    border-color: #218838;
+    color: white;
+}
+#playPause:hover {
+    background-color: #218838;
+    border-color: #1e7e34;
+}
+
+#playPause.playing { /* When isPlaying is true, button shows "Pause" */
+    background-color: #dc3545; /* Red for "Pause" state */
+    border-color: #d32535;
+}
+#playPause.playing:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+}
+
+/* #playPause.stopped could be styled same as default "Play" state or distinctly if needed */
+/* For now, default state (not .playing) covers "Play" and "Stopped" */
+
+
+#tempo { /* Styling for range input */
+    width: 120px;
+    height: 8px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #333;
+    outline: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: box-shadow 0.2s ease;
+}
+#tempo:focus {
+     box-shadow: 0 0 0 2px rgba(0, 245, 212, 0.3); /* Subtle glow for focus */
+}
+
+#tempo::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: #00F5D4; /* Teal thumb */
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+#tempo::-webkit-slider-thumb:hover {
+    background: #00DFC0; /* Lighter teal on hover */
+}
+
+#tempo::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: #00F5D4;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    transition: background-color 0.2s ease;
+}
+#tempo::-moz-range-thumb:hover {
+     background: #00DFC0;
+}
+
+/* Loop button style update based on JS behavior */
+/* JS directly sets background and color, so this class is for potential icon usage or if JS changes */
+#loop {
+    min-width: 90px; /* Ensure Loop On/Off fits */
+}
+#loop.active {
+    background-color: #00F5D4;
+    color: #121212;
+    border-color: #00DFC0; /* Slightly different border or same as background */
+}
+#loop.active:hover {
+    background-color: #00DFC0; /* Maintain active look on hover */
+    color: #121212;
+}
+
+
+/* Styling for general input range, if any others are added */
+input[type="range"] {
+    accent-color: #00F5D4; /* Modern way to color sliders, might override thumb styles */
+}
+
+/* Piano key styles */
+.white-key {
+    background-color: #DCDCDC; /* Light gray */
+    border-bottom: 1px solid #999; /* Separator line */
+    border-right: 1px solid #999;
+    height: 20px; /* Height of one note row */
+    position: relative; /* For note names and black key positioning */
+    box-sizing: border-box;
+    display: flex; /* For aligning note name */
+    align-items: center; /* For aligning note name */
+    justify-content: flex-end; /* Position note name to the right */
+    padding-right: 4px; /* Padding for note name */
+}
+
+.white-key:first-child {
+    border-top: 1px solid #999; /* Top border for the lowest white key */
+}
+
+.black-key {
+    background-color: #333333; /* Darker gray */
+    border: 1px solid #1A1A1A; /* Slightly offset border color */
+    height: 13px; /* Slightly shorter than white key row for visual overlap */
+    width: 65%; /* Percentage of the vertical piano width */
+    position: absolute; /* Positioned relative to the previous white key or container */
+    /* JavaScript will need to handle exact positioning for black keys if they are direct children of .vertical-piano */
+    /* If black keys are children of white keys (a common pattern), this changes. */
+    /* Current JS (setupVerticalPiano) makes them siblings. */
+    /* For sibling approach, margin/transform needed to pull it up over white key boundary */
+    left: 0; /* Align to left edge of vertical-piano */
+    z-index: 1; /* Draw on top of white key space it might occupy */
+    box-sizing: border-box;
+    /* The JS places keys sequentially. For black keys to overlap correctly with this CSS,
+       they would typically be positioned absolutely relative to the .vertical-piano container
+       or calculated to sit between white keys.
+       The current `flex-direction: column-reverse;` on `.vertical-piano` simplifies this:
+       A black key will sit on top of the white key that precedes it in markup if given a negative margin.
+       However, the `height: 12px` and `margin-left: 40%` was for a different layout.
+       Let's assume the JS positions them correctly based on their MIDI number for now,
+       and they are direct children of vertical-piano.
+       The `height: 13px` and `width: 65%` is a starting point.
+       The visual placement of black keys is tricky with pure flex order.
+       It's better to position black keys absolutely within the .vertical-piano or relative to white keys.
+       Given the current JS structure, I will adjust setupVerticalPiano to facilitate better black key positioning.
+       For now, let's keep the CSS simple and anticipate JS changes for black key placement.
+    */
+}
+/* Re-thinking black key CSS based on current JS:
+   JS creates them as direct children in order.
+   `flex-direction: column-reverse` means they stack from bottom up.
+   A black key needs to visually sit "on top" of the lower part of a white key
+   and "between" two white keys. This is hard with pure flex ordering of distinct black/white divs.
+   A common approach is to make black keys children of white keys, or absolute position all keys.
+   Let's stick to the previous simpler black key style and assume JS will handle visual offset if needed,
+   or we adjust the piano structure later if this becomes problematic for click targets / visual accuracy.
+*/
+.black-key { /* Reverted to a simpler style that relies on JS for finer positioning logic if needed */
+    background-color: #333333;
+    border: 1px solid #121212;
+    height: 20px; /* Match white key height for now, but visually appear shorter due to no top/bottom border */
+    background-color: #3A3A3A; /* Slightly lighter than true black for visibility */
+    height: 20px; /* Same height as white key slot for now */
+    width: 38px;  /* Narrower, e.g., approx 60-65% of vertical piano width */
+    margin: 0 auto; /* Center it horizontally in the flex item slot */
+    border: 1px solid #1c1c1c;
+    /* border-top: none; */ /* Optional: if trying to make it look like it emerges */
+    z-index: 1; /* Above white keys if they had overlapping elements, not strictly needed here */
+    position: relative; /* For z-index */
+    box-sizing: border-box;
+    /* To make it appear shorter and "on top", we can simulate this by giving it a
+       visible top part and making the rest transparent or same as piano background.
+       Or, more simply, just style it as a centered, darker, narrower bar.
+       The current JS stacks them; this CSS will make each black key a centered bar.
+       A true piano black key look (straddling white keys) requires absolute positioning
+       or restructuring HTML, which is beyond current step's scope of simple UI element creation/styling.
+    */
+}
+
+/* Make black keys effectively shorter by adding padding, so content area is smaller */
+.black-key {
+    height: 13px; /* Visually shorter */
+    margin-top: 3px; /* Pushes it down from top of its 20px slot */
+    margin-bottom: 4px; /* Total height used by element is 13+3+4 = 20px, matching white key slot */
+    /* This makes it appear inset within the 20px row height */
+}
+
+
+.note-block {
+    background-color: #00F5D4; /* Teal notes */
+    position: absolute; /* Positioned within the piano roll grid cells */
+    border-radius: 2px;
+    box-sizing: border-box;
+    opacity: 0.8;
+}
+
+.highlighted-key {
+    background-color: #00F5D4 !important; /* Teal highlight */
+}
+
+.playhead {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: #FF00A8; /* Magenta playhead */
+    left: 0; /* Initial position */
+}
+
+/* Styles for chord labels above the piano roll */
+.chord-label-container {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    /* Align with piano roll: vertical piano width (60px) + container gap (1rem) */
+    /* Assuming 1rem = 16px for this calculation. Adjust if base font size differs. */
+    padding-left: calc(60px + 1rem);
+    margin-right: 1rem; /* To balance the spacing if piano-roll has a conceptual end margin */
+    gap: 1rem; /* This should be the gap between the labels themselves */
+    margin-bottom: 0.5rem; /* Space before piano roll */
+    box-sizing: border-box; /* Include padding in width calculation */
+}
+
+.chord-label {
+    text-align: center;
+    font-size: 0.9rem;
+    color: #EAEAEA;
+}
+
+/* Add a container for chord labels in HTML if not already there, or adjust CSS to place them above the piano roll */
+/* We will add chord labels dynamically via JS */
+/* For vertical piano key names */
+.key-name {
+    position: absolute;
+    bottom: 2px; /* Adjust as needed */
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.6rem;
+    color: #121212; /* Dark text on light keys */
+    pointer-events: none; /* So they don't interfere with clicks if any */
+}
+
+/* Add a class for black key names if they need different styling */
+.black-key .key-name {
+    color: #EAEAEA; /* Light text on dark keys */
+}
+
+/* Ensure the piano roll container correctly encompasses the vertical piano and roll */
+.piano-roll-wrapper {
+    display: flex;
+    flex-direction: column; /* Chord labels on top, then the roll container */
+    flex-grow: 1;
+}

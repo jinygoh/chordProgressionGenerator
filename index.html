@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChordFlow</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <button id="randomizeAll">Randomize All</button>
+        <h1>ChordFlow</h1>
+    </header>
+
+    <main>
+        <div class="controls">
+            <select id="keySelector"></select>
+            <select id="scaleSelector"></select>
+            <select id="progressionSelector"></select>
+        </div>
+
+        <div class="piano-roll-container">
+            <div class="vertical-piano"></div>
+            <div class="piano-roll"></div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="playback-controls">
+            <button id="playPause">Play</button>
+            <button id="stop">Stop</button>
+            <input type="range" id="tempo" min="60" max="180" value="120">
+            <button id="loop">Loop</button>
+        </div>
+        <div class="export-controls">
+            <button id="exportMidi">Export MIDI</button>
+            <button id="exportWav">Export WAV</button>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/midi-writer-js@latest/build/MidiWriter.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
