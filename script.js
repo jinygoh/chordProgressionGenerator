@@ -50,37 +50,54 @@ document.addEventListener('DOMContentLoaded', () => {
     const scheduleAheadTime = 0.1; // seconds
     const lookahead = 25.0; // ms
 
-    let audioBuffers = {}; // To store pre-loaded audio buffers { midiNoteKey: AudioBuffer }
+    // Tone.js piano synth instance will be declared here or in init
+    let polyPianoSynth;
 
-    // --- Asset Paths (examples) ---
-    const PIANO_SAMPLES = {
-        // Using MIDI note 60 (C4) as the key for the primary sample
-        60: 'assets/piano-C4.mp3',
-        // To use more samples for different ranges, add them here:
-        // 48: 'assets/piano-C3.mp3',
-        // 72: 'assets/piano-C5.mp3',
+    // Global FMSynth options for consistency
+    const globalFmSynthOptions = {
+        harmonicity: 3.01,
+        modulationIndex: 14,
+        envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.8 }, // This envelope is for each voice
+        modulation: { type: "sine" },
+        modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.8 },
+        volume: -10 // Adjust volume for each voice
     };
-    const DEFAULT_SAMPLE_MIDI_NOTE = 60; // The MIDI note of the primary sample file used for playback rate adjustment
+
 
     // --- Initialization ---
-    async function init() { // Make init async
+    async function init() {
         console.log("Initializing ChordFlow...");
 
-        // Initialize AudioContext early
+        // Initialize base Web Audio API AudioContext (Tone.js will use its own or can adopt this)
         try {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             masterGain = audioContext.createGain();
-            masterGain.gain.setValueAtTime(0.5, audioContext.currentTime);
+            masterGain.gain.setValueAtTime(0.5, audioContext.currentTime); // Global volume control
             masterGain.connect(audioContext.destination);
+
+            if (typeof Tone !== 'undefined') {
+                polyPianoSynth = new Tone.PolySynth(Tone.FMSynth); // Pass only the synth type
+                // PolySynth has its own envelope that can affect all voices,
+                // or each voice (FMSynth) has its own. We are configuring voice envelopes.
+                // To set options for the voices (FMSynth instances):
+                polyPianoSynth.set(globalFmSynthOptions);
+
+                // If you want a master envelope for the PolySynth itself (e.g. for overall chord attack/release)
+                // polyPianoSynth.envelope.attack = 0.02; // Example
+
+                polyPianoSynth.connect(masterGain);
+
+            } else {
+                console.error("Tone.js not loaded!");
+                alert("Audio library (Tone.js) not loaded. Playback will not work.");
+            }
+
         } catch (e) {
-            alert('Web Audio API is not supported in this browser');
-            console.error("Web Audio API not supported:", e);
-            // Potentially disable audio features if this fails
+            alert('Web Audio API or Tone.js initialization failed.');
+            console.error("Web Audio API / Tone.js init error:", e);
         }
 
-        await loadAudioSamples(); // Load samples after AudioContext is ready
-
-        populateSelectors(); // UI setup can happen in parallel or after
+        populateSelectors();
         setupVerticalPiano();
         setupPianoRollGrid();
         //generateInitialProgression(); // Generate something on load
@@ -88,47 +105,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Event Listeners
     } // End of init function
-
-    async function loadAudioSamples() {
-        if (!audioContext) {
-            console.warn("AudioContext not ready for loading samples. Attempting to reinitialize.");
-            try {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                masterGain = audioContext.createGain();
-                masterGain.gain.setValueAtTime(0.5, audioContext.currentTime);
-                masterGain.connect(audioContext.destination);
-            } catch (e) {
-                alert('Web Audio API is not supported. Sampled audio will not be available.');
-                console.error("Web Audio API not supported during sample load attempt:", e);
-                return; // Exit if audio context cannot be established
-            }
-        }
-
-        const samplePath = PIANO_SAMPLES[DEFAULT_SAMPLE_MIDI_NOTE];
-        if (!samplePath) {
-            console.error(`Default piano sample path not found for MIDI note ${DEFAULT_SAMPLE_MIDI_NOTE}.`);
-            alert("Piano sound sample configuration error. Playback will use synthesized sounds.");
-            return;
-        }
-
-        try {
-            const response = await fetch(samplePath);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status} for ${samplePath}`);
-            }
-            const arrayBuffer = await response.arrayBuffer();
-            // Use a callback for decodeAudioData for wider compatibility, though await usually works
-            audioBuffers[DEFAULT_SAMPLE_MIDI_NOTE] = await new Promise((resolve, reject) => {
-                audioContext.decodeAudioData(arrayBuffer, resolve, reject);
-            });
-            console.log("Piano sample loaded and decoded:", samplePath);
-        } catch (error) {
-            console.error("Error loading or decoding audio sample:", samplePath, error);
-            alert(`Error loading piano sound: ${error.message}. Playback will use synthesized sounds.`);
-            // Fallback: sine wave will be used if PIANO_SAMPLES[DEFAULT_SAMPLE_MIDI_NOTE] buffer is not available.
-        }
-    }
-
 
     function populateSelectors() {
         randomizeAllButton.addEventListener('click', handleRandomizeAll);
@@ -449,7 +425,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- Event Handlers ---
-    function handleRandomizeAll() {
+    async function handleRandomizeAll() { // Made async
+        if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
+            try {
+                await Tone.start();
+                console.log("Tone.js AudioContext started by Randomize All.");
+            } catch (e) {
+                console.error("Tone.start() failed in handleRandomizeAll:", e);
+                alert("Audio context could not be started by Randomize All. Please click again or refresh.");
+                return; // Prevent further action if audio can't start
+            }
+        }
+
         console.log("Randomize All clicked");
         // 1. Select random key and scale
         const randomKeyIndex = Math.floor(Math.random() * NOTES.length);
@@ -566,14 +553,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Playback Functions ---
     let schedulerTimerID;
 
-    function togglePlayback() {
-        if (!audioContext) {
-            console.error("AudioContext not initialized.");
-            alert("Audio playback is not available.");
+    async function togglePlayback() { // Made async
+        if (!audioContext || !polyPianoSynth) {
+            console.error("AudioContext or PolySynth not initialized.");
+            alert("Audio playback system is not ready.");
             return;
         }
+
+        // Start Tone.js context if not already running
+        if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
+            try {
+                await Tone.start();
+                console.log("Tone.js AudioContext started by Play button.");
+            } catch (e) {
+                console.error("Tone.start() failed in togglePlayback:", e);
+                alert("Audio context could not be started. Please click Play again.");
+                return; // Prevent playback if audio can't start
+            }
+        }
+        // Also resume the base audioContext if it was suspended (though Tone.start() might handle this)
         if (audioContext.state === 'suspended') {
-            audioContext.resume();
+            await audioContext.resume();
         }
 
         isPlaying = !isPlaying;
@@ -668,69 +668,40 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function playPianoNote(midiNote, startTime, duration) {
-        if (!audioContext) return;
+    function playPianoNote(midiNote, startTime, durationSeconds) {
+        if (!polyPianoSynth || typeof Tone === 'undefined') {
+            console.warn("Tone.js PolySynth not initialized. Cannot play note.");
+            return;
+        }
 
-        const mainSampleBuffer = audioBuffers[DEFAULT_SAMPLE_MIDI_NOTE];
-
-        if (mainSampleBuffer) { // Play sample if loaded
-            const source = audioContext.createBufferSource();
-            source.buffer = mainSampleBuffer;
-
-            // Pitch shifting: Calculate playbackRate to shift pitch from DEFAULT_SAMPLE_MIDI_NOTE to midiNote
-            const semitones = midiNote - DEFAULT_SAMPLE_MIDI_NOTE;
-            source.playbackRate.value = Math.pow(2, semitones / 12);
-
-            const noteGain = audioContext.createGain();
-            source.connect(noteGain);
-            noteGain.connect(masterGain);
-
-            // ADSR Envelope
-            const attackTime = 0.01;
-            const decayTime = 0.1;
-            const sustainLevel = 0.7;
-            const actualReleaseTime = Math.min(0.5, duration * 0.3); // Release is 30% of note duration, max 0.5s
-
-            noteGain.gain.setValueAtTime(0, startTime);
-            noteGain.gain.linearRampToValueAtTime(1, startTime + attackTime);
-            noteGain.gain.linearRampToValueAtTime(sustainLevel, startTime + attackTime + decayTime);
-            noteGain.gain.setValueAtTime(sustainLevel, startTime + duration - actualReleaseTime);
-            noteGain.gain.linearRampToValueAtTime(0, startTime + duration);
-
-            source.start(startTime);
-            source.stop(startTime + duration + 0.1); // Allow a little tail for release
-
-        } else { // Fallback to sine wave
-            const oscillator = audioContext.createOscillator();
-            const noteGain = audioContext.createGain();
-            oscillator.connect(noteGain);
-            noteGain.connect(masterGain);
-            oscillator.type = 'triangle'; // Changed to triangle for a slightly softer sound than sine
-            oscillator.frequency.setValueAtTime(midiToFrequency(midiNote), startTime);
-
-            const attackTime = 0.01;
-            const decayTime = 0.1;
-            const sustainLevel = 0.7;
-            const releaseTime = Math.min(0.2, duration * 0.2); // Shorter release for synth sound
-
-            noteGain.gain.setValueAtTime(0, startTime);
-            noteGain.gain.linearRampToValueAtTime(1, startTime + attackTime);
-            noteGain.gain.linearRampToValueAtTime(sustainLevel, startTime + attackTime + decayTime);
-            noteGain.gain.setValueAtTime(sustainLevel, startTime + duration - releaseTime);
-            noteGain.gain.linearRampToValueAtTime(0, startTime + duration);
-
-            oscillator.start(startTime);
-            oscillator.stop(startTime + duration);
-            // Optional: Log fallback only once or less frequently to avoid console spam
-            // if (midiNote % 12 === 0) { // e.g. only for C notes
-            //     console.log(`Playing MIDI ${midiNote} as fallback synth (sample not loaded).`);
-            // }
+        // Ensure Tone.js AudioContext is running. This is crucial.
+        // It often needs to be started by a user gesture.
+        if (Tone.context.state !== 'running') {
+            Tone.start().then(() => {
+                console.log("Tone.js AudioContext started by playPianoNote gesture.");
+                // Note: The very first note might be missed if Tone.start() is async and resolves later.
+                // Ideally, Tone.start() is called earlier from a button click.
+                // For this integration, we'll proceed, subsequent notes should play.
+                const noteName = Tone.Frequency(midiNote, "midi").toNote();
+                polyPianoSynth.triggerAttackRelease(noteName, durationSeconds, startTime);
+            }).catch(e => {
+                console.error("Error starting Tone.js context from playPianoNote:", e);
+                // If Tone.start() fails, we can't play. Alert user or log.
+                // alert("Could not start audio. Please interact with the page (e.g. click a button) and try again.");
+            });
+        } else {
+            const noteName = Tone.Frequency(midiNote, "midi").toNote();
+            // The 'startTime' from our scheduler is an absolute time in the Web Audio API's AudioContext.
+            // Tone.js triggerAttackRelease 'time' parameter also expects an absolute time in the Tone.context timeline.
+            // If Tone.context is the same as audioContext, this should align.
+            polyPianoSynth.triggerAttackRelease(noteName, durationSeconds, startTime);
         }
     }
 
-    function midiToFrequency(midi) {
-        return Math.pow(2, (midi - 69) / 12) * 440;
-    }
+    // midiToFrequency is no longer used after Tone.js integration for both live playback and WAV export.
+    // function midiToFrequency(midi) {
+    //     return Math.pow(2, (midi - 69) / 12) * 440;
+    // }
 
     function highlightPianoKey(midiNote, turnOn, durationMs) {
         const keyElement = verticalPianoContainer.querySelector(`[data-midi="${midiNote}"]`);
@@ -887,100 +858,74 @@ async function exportWAV() {
         alert("No progression to export!");
         return;
     }
-    if (!audioContext) {
-        alert("AudioContext not available. Cannot export WAV.");
+    if (typeof Tone === 'undefined' || !polyPianoSynth) {
+        alert("Tone.js or synth not initialized. Cannot export WAV.");
+        console.error("Tone.js or polyPianoSynth not available for WAV export.");
         return;
     }
 
-    const originalAudioContextState = { isPlaying, playheadPosition, nextNoteTime };
+    // Tone.start might be needed if the context was not started by a user gesture yet.
+    // However, Tone.Offline should handle its own context.
+    if (Tone.context.state !== 'running') {
+        await Tone.start().catch(e => {
+            console.error("Tone.start() failed before WAV export:", e);
+            alert("Audio context could not be started. Please interact with the page first.");
+            return; // Stop if Tone can't start
+        });
+    }
+
+    const originalIsPlaying = isPlaying; // Simpler state to restore check
     if (isPlaying) {
-        // Simple stop, no attempt to perfectly restore complex scheduler state for now
-        stopButton.click(); // Simulate user clicking stop
+        stopButton.click(); // Stop live playback
     }
 
     const secondsPerBeat = 60.0 / tempo;
     const beatsPerBar = 4;
     const secondsPerBar = secondsPerBeat * beatsPerBar;
-    const totalDuration = NUM_BARS * secondsPerBar;
-
-    const offlineCtx = new OfflineAudioContext(2, Math.ceil(totalDuration * audioContext.sampleRate), audioContext.sampleRate);
-    const offlineMasterGain = offlineCtx.createGain();
-    offlineMasterGain.gain.setValueAtTime(0.5, 0);
-    offlineMasterGain.connect(offlineCtx.destination);
-
-    let currentTime = 0;
-    for (const chord of currentProgression) {
-        if (chord && chord.notes && chord.notes.length > 0) {
-            const mainSampleBuffer = audioBuffers[DEFAULT_SAMPLE_MIDI_NOTE];
-
-            chord.notes.forEach(midiNote => {
-                if (mainSampleBuffer) {
-                    const source = offlineCtx.createBufferSource();
-                    source.buffer = mainSampleBuffer;
-                    const semitones = midiNote - DEFAULT_SAMPLE_MIDI_NOTE;
-                    source.playbackRate.value = Math.pow(2, semitones / 12);
-
-                    const noteGain = offlineCtx.createGain();
-                    source.connect(noteGain);
-                    noteGain.connect(offlineMasterGain);
-
-                    const attackTime = 0.01, decayTime = 0.1, sustainLevel = 0.7;
-                    const actualReleaseTime = Math.min(0.5, secondsPerBar * 0.3);
-
-                    noteGain.gain.setValueAtTime(0, currentTime);
-                    noteGain.gain.linearRampToValueAtTime(1, currentTime + attackTime);
-                    noteGain.gain.linearRampToValueAtTime(sustainLevel, currentTime + attackTime + decayTime);
-                    noteGain.gain.setValueAtTime(sustainLevel, currentTime + secondsPerBar - actualReleaseTime);
-                    noteGain.gain.linearRampToValueAtTime(0, currentTime + secondsPerBar);
-
-                    source.start(currentTime);
-                    source.stop(currentTime + secondsPerBar + 0.1);
-                } else {
-                    const oscillator = offlineCtx.createOscillator();
-                    const noteGain = offlineCtx.createGain();
-                    oscillator.connect(noteGain);
-                    noteGain.connect(offlineMasterGain);
-                    oscillator.type = 'triangle';
-                    oscillator.frequency.setValueAtTime(midiToFrequency(midiNote), currentTime);
-
-                    const attackTime = 0.01, decayTime = 0.1, sustainLevel = 0.7;
-                    const releaseTime = Math.min(0.2, secondsPerBar * 0.2);
-
-                    noteGain.gain.setValueAtTime(0, currentTime);
-                    noteGain.gain.linearRampToValueAtTime(1, currentTime + attackTime);
-                    noteGain.gain.linearRampToValueAtTime(sustainLevel, currentTime + attackTime + decayTime);
-                    noteGain.gain.setValueAtTime(sustainLevel, currentTime + secondsPerBar - releaseTime);
-                    noteGain.gain.linearRampToValueAtTime(0, currentTime + secondsPerBar);
-
-                    oscillator.start(currentTime);
-                    oscillator.stop(currentTime + secondsPerBar);
-                }
-            });
-        }
-        currentTime += secondsPerBar;
-    }
+    const totalDurationSeconds = NUM_BARS * secondsPerBar;
 
     try {
-        console.log("Starting offline rendering for WAV export...");
-        const renderedBuffer = await offlineCtx.startRendering();
-        const wavBlob = audioBufferToWav(renderedBuffer);
+        console.log("Starting Tone.Offline rendering for WAV export...");
+
+        const renderedBuffer = await Tone.Offline(async (offlineTransport) => {
+            // Use the globally defined FMSynth options for consistency
+            const offlinePolySynth = new Tone.PolySynth(Tone.FMSynth);
+            offlinePolySynth.set(globalFmSynthOptions);
+            offlinePolySynth.toDestination();
+
+            let currentTime = 0;
+            currentProgression.forEach(chord => {
+                if (chord && chord.notes && chord.notes.length > 0) {
+                    const frequencies = chord.notes.map(midi => Tone.Frequency(midi, "midi").toNote());
+                    offlinePolySynth.triggerAttackRelease(frequencies, secondsPerBar, currentTime);
+                }
+                currentTime += secondsPerBar;
+            });
+            // No need to call offlineTransport.start() if scheduling with absolute times for triggerAttackRelease
+        }, totalDurationSeconds);
+
+        const nativeAudioBuffer = renderedBuffer.get();
+        if (!nativeAudioBuffer) {
+            throw new Error("Tone.Offline did not produce a valid AudioBuffer.");
+        }
+
+        const wavBlob = audioBufferToWav(nativeAudioBuffer);
 
         const a = document.createElement('a');
         a.href = URL.createObjectURL(wavBlob);
-        a.download = "ChordFlow_Progression.wav";
+        a.download = "ChordFlow_Progression_Tone.wav";
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(a.href);
-        console.log("WAV Exported");
+        console.log("WAV Exported using Tone.Offline");
 
     } catch (error) {
-        console.error("Error rendering or exporting WAV:", error);
+        console.error("Error rendering or exporting WAV with Tone.Offline:", error);
         alert("Failed to export WAV: " + error.message);
     } finally {
-        if (originalAudioContextState.isPlaying) {
+        if (originalIsPlaying) { // Check if it was playing before
              console.log("Playback was stopped for WAV export. Please press Play to resume if desired.");
-             // No automatic restart to avoid complexity with scheduler state.
         }
     }
     }
